@@ -228,7 +228,7 @@ def reconstruct(coeffs, g0_col, g1_col, g0_row, g1_row, h_filts,  mode, separabl
         # Do the synthesis filter banks
         if separable:
             lh, hl, hh = torch.unbind(h, dim=2)
-            fi = ns - i if ns - i < nf else -1
+            fi = ns - 1 -i if ns - 1 - i < nf else -1
             filts = (g0_col[fi], g1_col[fi], g0_row[fi], g1_row[fi])
             ll = lowlevel.sfb2d(ll, lh, hl, hh, filts, mode=mode)
         else:
