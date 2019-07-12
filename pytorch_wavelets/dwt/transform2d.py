@@ -2,6 +2,7 @@ import torch.nn as nn
 import pywt
 import pytorch_wavelets.dwt.lowlevel as lowlevel
 import torch
+import numpy as np
 
 
 #def get_highpass_filter(var_filter):
@@ -13,6 +14,7 @@ def get_highpass_filter(var_filter):
     a = torch.zeros_like(var_filter)
     a[0, 0, :, 0] = torch.pow(-1., torch.arange(0., var_filter.size(2)))
     return a*torch.flip(var_filter,[2])
+
 
 class DWTForward(nn.Module):
     """ Performs a 2d DWT Forward decomposition of an image
@@ -31,12 +33,14 @@ class DWTForward(nn.Module):
     def __init__(self, J=1, wave='db1', mode='zero', separable=True):
         super().__init__()
         self.get_high_from_low = False
+        self.n_scales = 1
         if isinstance(wave, str):
             wave = pywt.Wavelet(wave)
         if isinstance(wave, pywt.Wavelet):
-            h0_col, h1_col = wave.dec_lo, wave.dec_hi
-            h0_row, h1_row = h0_col, h1_col
+            h0_col, h1_col = np.expand_dims(np.array(wave.dec_lo), 0), np.expand_dims(np.array(wave.dec_hi), 0)
+            h0_row, h1_row = np.expand_dims(np.array(h0_col), 0), np.expand_dims(np.array(h1_col), 0)
         else:
+            self.n_scales = len(wave[0])
             if len(wave) == 1:
                 self.get_high_from_low = True
                 h0_col, h1_col = wave[0], None
@@ -66,9 +70,9 @@ class DWTForward(nn.Module):
 
     def get_filts(self):
         if self.get_high_from_low:
-            self.h0_row = self.h0_col.reshape((1, 1, 1, -1))
-            self.h1_col = get_highpass_filter(self.h0_col)
-            self.h1_row = self.h1_col.reshape((1, 1, 1, -1))
+            self.h0_row = self.h0_col.reshape((self.n_scales, 1, 1, 1, -1))
+            self.h1_col = torch.cat([get_highpass_filter(h).unsqueeze(0) for h in self.h0_col], dim=0)
+            self.h1_row = self.h1_col.reshape((self.n_scales, 1, 1, 1, -1))
 
         if self.separable:
             return (self.h0_col, self.h1_col, self.h0_row, self.h1_row)
@@ -107,18 +111,20 @@ class DWTForward(nn.Module):
         filts = self.get_filts()
         # Do a multilevel transform
         for j in range(self.J):
+            fi = j if j < self.n_scales else -1
+            jfilts = (filts[0][fi], filts[1][fi], filts[2][fi], filts[3][fi])
             # Do 1 level of the transform
             if self.separable:
                 #filts = (self.h0_col, self.h1_col, self.h0_row, self.h1_row)
-                y = lowlevel.afb2d(ll, filts, self.mode)
+                y = lowlevel.afb2d(ll, jfilts, self.mode)
             else:
-                y = lowlevel.afb2d_nonsep(ll, filts, self.mode)
+                y = lowlevel.afb2d_nonsep(ll, jfilts, self.mode)
 
             # Separate the low and bandpasses
             s = y.shape
             y = y.reshape(s[0], -1, 4, s[-2], s[-1])
-            ll = y[:,:,0].contiguous()
-            yh.append(y[:,:,1:].contiguous())
+            ll = y[:, :, 0].contiguous()
+            yh.append(y[:, :, 1:].contiguous())
 
         return ll, yh
 
@@ -163,8 +169,6 @@ class DWTInverse(nn.Module):
                 g0_col, g1_col, g0_row, g1_row)
             self.h = nn.Parameter(filts, requires_grad=False)
 
-
-
     def forward(self, coeffs):
         return self.reconstruct(coeffs, self.g0_col, self.g1_col, self.g0_row, self.g1_row)
 
@@ -182,6 +186,7 @@ def get_rec_filters(h0_col, h1_col, h0_row, h1_row):
     g0_row = h0_row #torch.flip(h0_row, [2])
     g1_row = h1_row #torch.flip(h1_row, [2])
     return g0_col, g1_col, g0_row, g1_row
+
 
 def reconstruct(coeffs, g0_col, g1_col, g0_row, g1_row, h_filts,  mode, separable):
     """
@@ -203,11 +208,13 @@ def reconstruct(coeffs, g0_col, g1_col, g0_row, g1_row, h_filts,  mode, separabl
         Can have None for any of the highpass scales and will treat the
         values as zeros (not in an efficient way though).
     """
+    nf = len(g0_col)
     yl, yh = coeffs
     ll = yl
+    ns = len(yh)
 
     # Do a multilevel inverse transform
-    for h in yh[::-1]:
+    for i, h in enumerate(yh[::-1]):
         if h is None:
             h = torch.zeros(ll.shape[0], ll.shape[1], 3, ll.shape[-2],
                             ll.shape[-1], device=ll.device)
@@ -221,9 +228,10 @@ def reconstruct(coeffs, g0_col, g1_col, g0_row, g1_row, h_filts,  mode, separabl
         # Do the synthesis filter banks
         if separable:
             lh, hl, hh = torch.unbind(h, dim=2)
-            filts = (g0_col, g1_col, g0_row, g1_row)
+            fi = ns - i if ns - i < nf else -1
+            filts = (g0_col[fi], g1_col[fi], g0_row[fi], g1_row[fi])
             ll = lowlevel.sfb2d(ll, lh, hl, hh, filts, mode=mode)
         else:
-            c = torch.cat((ll[:,:,None], h), dim=2)
+            c = torch.cat((ll[:, :, None], h), dim=2)
             ll = lowlevel.sfb2d_nonsep(c, h_filts, mode=mode)
     return ll

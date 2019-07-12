@@ -513,7 +513,6 @@ def prep_filt_sfb2d(g0_col, g1_col, g0_row=None, g1_row=None, device=None):
     else:
         g1_row = torch.tensor(g1_row, device=device, dtype=t).reshape((1, 1, 1, -1))
 
-
     return g0_col, g1_col, g0_row, g1_row
 
 
@@ -535,26 +534,27 @@ def prep_filt_afb2d(h0_col, h1_col, h0_row=None, h1_row=None, device=None):
     Returns:
         (h0_col, h1_col, h0_row, h1_row)
     """
-    h0_col = np.array(h0_col[::-1]).ravel()
+    nls = len(h0_col)
+    h0_col = np.array([np.array(h[::-1]).ravel() for h in h0_col])
     t = torch.get_default_dtype()
 
-    h0_col = nn.Parameter(torch.tensor(h0_col, device=device, dtype=t).reshape((1,1,-1,1)))
+    h0_col = nn.Parameter(torch.tensor(h0_col, device=device, dtype=t).reshape((nls, 1,1,-1,1)))
 
     if h1_col is not None:
-        h1_col = np.array(h1_col[::-1]).ravel()
-        h1_col = nn.Parameter(torch.tensor(h1_col, device=device, dtype=t).reshape((1,1,-1,1)))
+        h1_col = np.array([np.array(h[::-1]).ravel() for h in h1_col])
+        h1_col = nn.Parameter(torch.tensor(h1_col, device=device, dtype=t).reshape((nls, 1,1,-1,1)))
 
     if h0_row is None:
-        h0_row = h0_col.reshape((1, 1, 1, -1))
+        h0_row = h0_col.reshape((nls, 1, 1, 1, -1))
     else:
-        h0_row = np.array(h0_row[::-1]).ravel()
-        h0_row = nn.Parameter(torch.tensor(h0_row, device=device, dtype=t).reshape((1, 1, 1, -1)))
+        h0_row = np.array([np.array(h[::-1]).ravel() for h in h0_row])
+        h0_row = nn.Parameter(torch.tensor(h0_row, device=device, dtype=t).reshape((nls, 1, 1, 1, -1)))
     if h1_row is None:
         if h1_col is not None:
-            h1_row = h1_col.reshape((1, 1, 1, -1))
+            h1_row = h1_col.reshape((nls, 1, 1, 1, -1))
     else:
-        h1_row = np.array(h1_row[::-1]).ravel()
-        h1_row = nn.Parameter(torch.tensor(h1_row, device=device, dtype=t).reshape((1, 1, 1, -1)))
+        h1_row = np.array([np.array(h[::-1]).ravel() for h in h1_row])
+        h1_row = nn.Parameter(torch.tensor(h1_row, device=device, dtype=t).reshape((nls, 1, 1, 1, -1)))
 
     return h0_col, h1_col, h0_row, h1_row
 
