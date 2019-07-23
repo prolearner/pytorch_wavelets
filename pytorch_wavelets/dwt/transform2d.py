@@ -13,7 +13,7 @@ import numpy as np
 def get_highpass_filter(var_filter):
     a = torch.zeros_like(var_filter)
     a[0, 0, :, 0] = torch.pow(-1., torch.arange(0., var_filter.size(2)))
-    return a*torch.flip(var_filter,[2])
+    return a*torch.flip(var_filter, [2])
 
 
 class DWTForward(nn.Module):
