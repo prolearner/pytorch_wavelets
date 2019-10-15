@@ -221,9 +221,9 @@ def reconstruct(coeffs, g0_col, g1_col, g0_row, g1_row, h_filts,  mode, separabl
 
         # 'Unpad' added dimensions
         if ll.shape[-2] > h.shape[-2]:
-            ll = ll[...,:-1,:]
+            ll = ll[..., :-1, :]
         if ll.shape[-1] > h.shape[-1]:
-            ll = ll[...,:-1]
+            ll = ll[..., :-1]
 
         # Do the synthesis filter banks
         if separable:

@@ -151,7 +151,7 @@ def sfb1d(lo, hi, g0, g1, mode='zero', dim=-1):
         g1 = torch.tensor(np.copy(np.array(g1).ravel()),
                           dtype=torch.float, device=lo.device)
     L = g0.numel()
-    shape = [1,1,1,1]
+    shape = [1, 1, 1, 1]
     shape[d] = L
     N = 2*lo.shape[d]
     # If g aren't in the right shape, make them so
@@ -160,9 +160,9 @@ def sfb1d(lo, hi, g0, g1, mode='zero', dim=-1):
     if g1.shape != tuple(shape):
         g1 = g1.reshape(*shape)
 
-    s = (2, 1) if d == 2 else (1,2)
-    g0 = torch.cat([g0]*C,dim=0)
-    g1 = torch.cat([g1]*C,dim=0)
+    s = (2, 1) if d == 2 else (1, 2)
+    g0 = torch.cat([g0]*C, dim=0)
+    g1 = torch.cat([g1]*C, dim=0)
     if mode == 'per' or mode == 'periodization':
         y = F.conv_transpose2d(lo, g0, stride=s, groups=C) + \
             F.conv_transpose2d(hi, g1, stride=s, groups=C)
